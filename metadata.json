@@ -1,0 +1,6 @@
+{
+  "name": "AgroFish ERP & POS Desktop",
+  "description": "Sistem ERP & Kasir Toko Pakan Ternak, Pelet Ikan & Alat Pancing Nelayan",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
