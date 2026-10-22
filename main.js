@@ -6,51 +6,114 @@
 import { app, BrowserWindow, ipcMain, Menu, dialog, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let mainWindow = null;
 
+// Handle uncaught exceptions to prevent silent crash
+process.on('uncaughtException', (error) => {
+  console.error('Main Process Error:', error);
+});
+
+function findPreloadScript() {
+  const candidates = [
+    path.join(__dirname, 'preload.cjs'),
+    path.join(app.getAppPath(), 'preload.cjs'),
+    path.join(__dirname, 'preload.js'),
+    path.join(app.getAppPath(), 'preload.js'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return path.join(__dirname, 'preload.cjs');
+}
+
+function findIndexHtml() {
+  const candidates = [
+    path.join(app.getAppPath(), 'dist', 'index.html'),
+    path.join(__dirname, 'dist', 'index.html'),
+    path.join(process.cwd(), 'dist', 'index.html'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return path.join(app.getAppPath(), 'dist', 'index.html');
+}
+
+function findAppIcon() {
+  const candidates = [
+    path.join(__dirname, 'public', 'icon.ico'),
+    path.join(__dirname, 'public', 'icon.png'),
+    path.join(app.getAppPath(), 'public', 'icon.png'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return undefined;
+}
+
 function createWindow() {
+  const icon = findAppIcon();
+
   mainWindow = new BrowserWindow({
     width: 1366,
     height: 820,
-    minWidth: 1080,
-    minHeight: 700,
+    minWidth: 1024,
+    minHeight: 680,
     title: 'AgroFish ERP & POS Desktop',
     backgroundColor: '#0f172a',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: findPreloadScript(),
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: true,
+      webSecurity: false, // Memastikan aset lokal file:// dapat dimuat tanpa terblokir di Windows
     },
-    icon: path.join(__dirname, 'public/icon.ico'),
-    show: false, // will show when ready-to-show to prevent white flash
+    ...(icon ? { icon } : {}),
+    show: false,
   });
 
-  // Check development or production mode
-  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+  // Cek apakah mode dev atau aplikasi terinstal (.exe)
+  const isDev = !app.isPackaged && (process.env.NODE_ENV === 'development' || Boolean(process.env.VITE_DEV_SERVER_URL));
   const devServerUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:3000';
 
   if (isDev) {
     mainWindow.loadURL(devServerUrl).catch(() => {
-      // If dev server not yet ready, load from dist
-      mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
+      const localFile = findIndexHtml();
+      mainWindow.loadFile(localFile);
     });
-    // Open DevTools in dev mode if needed
-    // mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
+    // Mode Produksi / Terinstall .exe
+    const localFile = findIndexHtml();
+    mainWindow.loadFile(localFile).catch((err) => {
+      console.error('Gagal memuat dist/index.html:', err);
+      dialog.showErrorBox(
+        'Gagal Membuka Halaman Aplikasi',
+        `Berkas antarmuka tidak ditemukan pada:\n${localFile}\n\nPastikan Anda telah menjalankan "npm run build" sebelum membuat paket instalasi installer.`
+      );
+    });
   }
 
+  // Tampilkan jendela saat sudah siap agar tidak ada white flash
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     mainWindow.maximize();
   });
 
-  // Handle external links (like WhatsApp wa.me) securely
+  // Tangani kegagalan muat halaman
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.warn(`did-fail-load: ${errorCode} - ${errorDescription}`);
+    if (isDev) {
+      const localFile = findIndexHtml();
+      if (fs.existsSync(localFile)) {
+        mainWindow.loadFile(localFile);
+      }
+    }
+  });
+
+  // Buka link WhatsApp / website di browser default Windows, bukan di dalam Electron
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https:') || url.startsWith('http:') || url.startsWith('mailto:')) {
       shell.openExternal(url);
@@ -137,7 +200,7 @@ function setupAppMenu() {
 ipcMain.handle('app:version', () => app.getVersion());
 
 ipcMain.handle('app:print-receipt', async (event, options) => {
-  if (!mainWindow) return false;
+  if (!mainWindow) return { success: false, failureReason: 'No window' };
   return new Promise((resolve) => {
     mainWindow.webContents.print(
       {
@@ -156,7 +219,7 @@ ipcMain.handle('app:open-external', async (event, url) => {
   return shell.openExternal(url);
 });
 
-// App lifecycle
+// App Lifecycle
 app.whenReady().then(() => {
   createWindow();
 
