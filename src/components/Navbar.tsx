@@ -169,10 +169,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* User Badge & Logout Button */}
           <div className="flex items-center gap-2">
-            <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-slate-300">
+            <button
+              type="button"
+              onClick={() => onNavigate('settings')}
+              title="Kelola Akun & Ubah Password Login"
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 hover:border-emerald-500/50 rounded-xl text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
+            >
               <Shield className="w-3.5 h-3.5 text-emerald-400" />
               <span className="font-semibold">{currentUser}</span>
-            </div>
+              <span className="text-[10px] text-slate-400 font-normal ml-0.5">(Atur Password)</span>
+            </button>
 
             <button
               type="button"

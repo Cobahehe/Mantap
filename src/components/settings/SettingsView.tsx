@@ -22,18 +22,25 @@ import {
   Lock,
   KeyRound,
   Shield,
+  LogOut,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 interface SettingsViewProps {
   settings: StoreSettings;
   onUpdateSettings: (newSettings: StoreSettings) => void;
   onResetAllData: () => void;
+  onAuthUpdated?: (newUsername: string) => void;
+  onLogout?: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   settings,
   onUpdateSettings,
   onResetAllData,
+  onAuthUpdated,
+  onLogout,
 }) => {
   const [formData, setFormData] = useState<StoreSettings>({ ...settings });
   const [newCashierName, setNewCashierName] = useState('');
@@ -50,6 +57,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [authSuccess, setAuthSuccess] = useState('');
+  const [showAuthPasswords, setShowAuthPasswords] = useState(false);
+
+  const handleResetAuthToDefault = () => {
+    if (confirm('Kembalikan kredensial login ke bawaan pabrik (username: admin, password: admin)?')) {
+      StorageService.resetAuthCredentials();
+      const def = StorageService.getAuthCredentials();
+      setAuthUsername(def.username);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setAuthError('');
+      setAuthSuccess('Kredensial login berhasil direset ke bawaan: username "admin", password "admin"');
+      if (onAuthUpdated) {
+        onAuthUpdated(def.username);
+      }
+    }
+  };
 
   const handleUpdateAuthCredentials = (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,6 +109,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setNewPassword('');
     setConfirmPassword('');
     setAuthSuccess('Kredensial login (username & password) berhasil diperbarui!');
+    if (onAuthUpdated) {
+      onAuthUpdated(authUsername.trim());
+    }
   };
 
   // Backup & Import
@@ -436,13 +463,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
         {/* LOGIN CREDENTIALS MANAGEMENT (Username & Password) */}
         <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl space-y-4">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+          <div className="flex flex-wrap items-center justify-between pb-2 border-b border-slate-800 gap-2">
             <div className="flex items-center gap-2">
               <KeyRound className="w-5 h-5 text-emerald-400" />
               <div>
                 <h4 className="font-bold text-sm text-white">Keamanan & Kredensial Login Aplikasi</h4>
-                <p className="text-xs text-slate-400">Ubah username dan password untuk masuk ke aplikasi (Default: admin / admin)</p>
+                <p className="text-xs text-slate-400">Ubah username dan password untuk masuk ke aplikasi (Bawaan: admin / admin)</p>
               </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowAuthPasswords(!showAuthPasswords)}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                {showAuthPasswords ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                <span>{showAuthPasswords ? 'Sembunyikan Password' : 'Lihat Password'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResetAuthToDefault}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                title="Reset kembali ke username admin dan password admin"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset ke Default (admin / admin)</span>
+              </button>
             </div>
           </div>
 
@@ -479,7 +527,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 Password Saat Ini (Konfirmasi Keamanan) *
               </label>
               <input
-                type="password"
+                type={showAuthPasswords ? 'text' : 'password'}
                 placeholder="Ketik password lama..."
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
@@ -492,7 +540,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 Password Baru (Opsional jika hanya ganti username)
               </label>
               <input
-                type="password"
+                type={showAuthPasswords ? 'text' : 'password'}
                 placeholder="Ketik password baru..."
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -505,7 +553,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 Ulangi Password Baru
               </label>
               <input
-                type="password"
+                type={showAuthPasswords ? 'text' : 'password'}
                 placeholder="Konfirmasi password baru..."
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -514,14 +562,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
-          <div className="flex justify-end pt-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+            {onLogout ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm('Keluar dari sesi login sekarang dan kembali ke layar login?')) {
+                    onLogout();
+                  }
+                }}
+                className="px-3.5 py-2 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-400 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                Keluar (Logout) Akun Sekarang
+              </button>
+            ) : <div />}
+
             <button
               type="button"
               onClick={handleUpdateAuthCredentials}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-md shadow-emerald-950/40 cursor-pointer"
             >
               <Lock className="w-3.5 h-3.5" />
-              Perbarui Kredensial Login
+              Simpan Perubahan Kredensial
             </button>
           </div>
         </div>

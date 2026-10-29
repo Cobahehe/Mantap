@@ -18,6 +18,7 @@ import { LoginView } from './components/auth/LoginView';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(StorageService.isLoggedIn());
+  const [currentUser, setCurrentUser] = useState<string>(() => StorageService.getAuthCredentials().username);
   const [currentPage, setCurrentPage] = useState<MainNavPage>('pos');
 
   // Core App Data
@@ -30,7 +31,6 @@ export default function App() {
   // Inter-tab transition helper (e.g. from POS Receipt to Delivery)
   const [deliveryTrxTarget, setDeliveryTrxTarget] = useState<Transaction | null>(null);
 
-
   // Initial Data Load
   const loadData = () => {
     setProducts(StorageService.getProducts());
@@ -38,6 +38,7 @@ export default function App() {
     setCustomers(StorageService.getCustomers());
     setDeliveries(StorageService.getDeliveries());
     setSettings(StorageService.getSettings());
+    setCurrentUser(StorageService.getAuthCredentials().username);
   };
 
   useEffect(() => {
@@ -78,6 +79,7 @@ export default function App() {
   const handleLogout = () => {
     StorageService.logout();
     setIsAuthenticated(false);
+    setCurrentPage('pos');
   };
 
   if (!isAuthenticated) {
@@ -90,8 +92,6 @@ export default function App() {
       />
     );
   }
-
-  const currentUser = StorageService.getAuthCredentials().username;
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 font-sans text-slate-100 antialiased select-none">
@@ -168,6 +168,8 @@ export default function App() {
             settings={settings}
             onUpdateSettings={setSettings}
             onResetAllData={handleResetAllData}
+            onAuthUpdated={(newU) => setCurrentUser(newU)}
+            onLogout={handleLogout}
           />
         )}
       </main>

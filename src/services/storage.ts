@@ -1434,7 +1434,11 @@ export const StorageService = {
 
   // AUTHENTICATION (Login & Logout)
   getAuthCredentials(): AuthCredentials {
-    return getFromStorage<AuthCredentials>(STORAGE_KEYS.AUTH, DEFAULT_AUTH);
+    const creds = getFromStorage<AuthCredentials>(STORAGE_KEYS.AUTH, DEFAULT_AUTH);
+    if (!creds || !creds.username || !creds.password) {
+      return DEFAULT_AUTH;
+    }
+    return creds;
   },
 
   saveAuthCredentials(creds: AuthCredentials): void {
@@ -1442,22 +1446,50 @@ export const StorageService = {
   },
 
   isLoggedIn(): boolean {
-    return localStorage.getItem(STORAGE_KEYS.SESSION) === 'true';
+    try {
+      // User must login when opening the application (session-based)
+      return sessionStorage.getItem(STORAGE_KEYS.SESSION) === 'true';
+    } catch (e) {
+      return false;
+    }
   },
 
   login(username: string, password: string): { success: boolean; message?: string } {
     const creds = this.getAuthCredentials();
-    if (username.trim() === creds.username && password === creds.password) {
-      localStorage.setItem(STORAGE_KEYS.SESSION, 'true');
+    const cleanUser = (username || '').trim().toLowerCase();
+    const validUser = (creds.username || 'admin').trim().toLowerCase();
+    const cleanPass = (password || '').trim();
+    const validPass = (creds.password || 'admin').trim();
+
+    if (cleanUser === validUser && cleanPass === validPass) {
+      try {
+        sessionStorage.setItem(STORAGE_KEYS.SESSION, 'true');
+        // Clear any old permanent localStorage session so it doesn't linger
+        localStorage.removeItem(STORAGE_KEYS.SESSION);
+      } catch (e) {
+        console.error('Session storage error:', e);
+      }
       const updatedCreds = { ...creds, lastLogin: new Date().toISOString() };
       this.saveAuthCredentials(updatedCreds);
       return { success: true };
     }
-    return { success: false, message: 'Username atau password salah! (Default: admin / admin)' };
+    return {
+      success: false,
+      message: `Username atau password salah! Default sistem: username "${creds.username || 'admin'}" dan password "${creds.password || 'admin'}"`,
+    };
   },
 
   logout(): void {
-    localStorage.removeItem(STORAGE_KEYS.SESSION);
+    try {
+      sessionStorage.removeItem(STORAGE_KEYS.SESSION);
+      localStorage.removeItem(STORAGE_KEYS.SESSION);
+    } catch (e) {
+      console.error('Logout error:', e);
+    }
+  },
+
+  resetAuthCredentials(): void {
+    this.saveAuthCredentials(DEFAULT_AUTH);
   },
 };
 
